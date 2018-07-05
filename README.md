@@ -3,24 +3,24 @@
 ## Installation
 
 ``` shell
-λ git clone github.com/rpip/crawl
-λ cd crawl && make deps && make
-λ ./crawl --help
-Usage of ./crawl:
+$ go get github.com/rpip/crawl
+$ crawl --help
+Usage of crawl:
   -d int
     	Depth of lookup within page (default 4)
   -u string
-    	URL to start crawl on (default "https://www.stearsng.com")
+    	URL to start crawl on
+  -v	Verbose mode (default true)
 ```
 
 
-```shell
-λ go run *.go --u=https://jeiwan.cc --d=3
+``` shell
+$ crawl -u=https://golang.org -d=2 -v=false > sitemap.txt
 ```
 
 ## Docker
 
 ```shell
-λ make docker
-λ docker run -i -t mz/crawl
+$ make docker
+$ docker run -i -t mz/crawl
 ```

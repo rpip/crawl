@@ -1,4 +1,4 @@
-package main
+package crawler
 
 import (
 	"errors"
@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/PuerkitoBio/purell"
 	radix "github.com/armon/go-radix"
 )
 
@@ -28,9 +29,10 @@ type responseCh chan *Page
 
 // Page describe a crawled page
 type Page struct {
-	url   *url.URL
-	title string
-	urls  []*url.URL
+	URL    *url.URL
+	Title  string
+	URLs   []*url.URL
+	Indent int
 }
 
 // Fetcher is the interface that wraps the crawling mechanism
@@ -52,11 +54,12 @@ type Crawler struct {
 	client     *http.Client
 	startURL   *url.URL
 	seenURLs   *radix.Tree
+	verbose    bool
 }
 
 // NewCrawler creates a new crawler with the given base url, crawl depth,
 // and HTTP client, allowing overriding of the HTTP client to use
-func NewCrawler(url *url.URL, responseCh responseCh) *Crawler {
+func NewCrawler(url *url.URL, responseCh responseCh, verbose bool) *Crawler {
 	normalized := normalizeURL(url)
 	c := &Crawler{
 		startURL:   normalized,
@@ -67,24 +70,25 @@ func NewCrawler(url *url.URL, responseCh responseCh) *Crawler {
 			Timeout: defaultHTTPTimeout,
 		},
 		seenURLs: radix.New(),
+		verbose:  verbose,
 	}
 	return c
 }
 
 // Fetch returns scraped page. Page contains title, URLs found
 func (c *Crawler) Fetch(url *url.URL) (*Page, error) {
-	if c.IsProcessed(url.String()) {
+	if c.IsProcessed(url.Path) {
 		return nil, ErrVisitedRetry
 	}
 	// mark as seen
 	c.Lock()
-	c.seenURLs.Insert(url.String(), 1)
+	c.seenURLs.Insert(url.Path, struct{}{})
 	c.Unlock()
 
 	start := time.Now()
 	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
-		c.log.Printf("Error creating http request: %v\n", err)
+		c.debugf("Error creating http request: %v\n", err)
 		return nil, err
 	}
 	req.Header.Set("User-Agent", userAgent)
@@ -92,7 +96,7 @@ func (c *Crawler) Fetch(url *url.URL) (*Page, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.log.Printf("Completed in %v\n", time.Since(start))
+	c.debugf("Completed in %v\n", time.Since(start))
 	defer resp.Body.Close()
 	page := c.processPage(resp)
 	return page, err
@@ -130,20 +134,71 @@ func (c *Crawler) processPage(resp *http.Response) *Page {
 
 	// resolve urls to absolute uri from the base url
 	var result []*url.URL
+	seen := radix.New()
+
 	for _, u := range urls {
 		if uu, err := url.Parse(u); err == nil {
 			nu := normalizeURL(base.ResolveReference(uu))
 
 			if nu.Hostname() == c.host {
 				// first time seeing this
-				if !c.IsProcessed(nu.String()) {
-					result = append(result, nu)
+				if !c.IsProcessed(nu.Path) {
+					// collect only unique links on page
+					if _, ok := seen.Get(nu.Path); !ok {
+						seen.Insert(nu.Path, struct{}{})
+						result = append(result, nu)
+					}
 				}
 			} else {
-				log.Printf("ignored: external link, %s", nu)
+				c.debugf("ignored: external link, %s", nu)
 			}
 		}
 	}
 
-	return &Page{title: title, url: doc.Url, urls: result}
+	// return only unique links
+	return &Page{Title: title, URL: doc.Url, URLs: result}
+}
+
+// Crawl recursively scans the url and extract the children links
+func (c *Crawler) Crawl(uri *url.URL, depth int) {
+	var wg sync.WaitGroup
+
+	if c.IsProcessed(uri.Path) || depth <= 0 {
+		return
+	}
+	page, err := c.Fetch(uri)
+	if err == ErrVisitedRetry {
+		log.Printf("processed %s", c.IsProcessed(uri.Path))
+		return
+	}
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	// mark indentation for printing
+	page.Indent++
+	c.responseCh <- page
+
+	for _, u := range page.URLs {
+		wg.Add(1)
+		go func(u *url.URL) {
+			defer wg.Done()
+			c.Crawl(u, depth-1)
+		}(u)
+	}
+	wg.Wait()
+}
+
+func (c *Crawler) debugf(format string, args ...interface{}) {
+	if c.verbose {
+		c.log.Printf(format, args...)
+	}
+}
+
+// utils
+func normalizeURL(u *url.URL) *url.URL {
+	flags := purell.FlagsUsuallySafeGreedy | purell.FlagRemoveFragment | purell.FlagRemoveDuplicateSlashes
+	s := purell.NormalizeURL(u, flags)
+	u, _ = url.Parse(s)
+	return u
 }

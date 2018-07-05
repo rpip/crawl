@@ -5,60 +5,38 @@ import (
 	"fmt"
 	"log"
 	"net/url"
-	"os"
-	"sync"
+	"strings"
 
-	"github.com/PuerkitoBio/purell"
+	"github.com/rpip/crawl/crawler"
 )
 
 func main() {
 
 	depth := flag.Int("d", 4, "Depth of lookup within page")
-	// also try https://stratechery.com
-	baseURL := flag.String("u", "https://www.stearsng.com", "URL to start crawl on")
+	verbose := flag.Bool("v", true, "Verbose mode")
+	baseURL := flag.String("u", "", "URL to start crawl on")
 	flag.Parse()
 
 	startURL, err := url.Parse(*baseURL)
 	if err != nil {
-		log.Fatal("Invalid url. Please check and try again", err)
-		os.Exit(1)
+		log.Fatalf("failed to crawl %s: %v", startURL, err)
 	}
+	var responseCh = make(chan *crawler.Page)
+	defer close(responseCh)
 
-	var responseCh = make(chan *Page)
-	c := NewCrawler(startURL, responseCh)
-	go c.crawl(startURL, *depth)
+	c := crawler.NewCrawler(startURL, responseCh, *verbose)
+	go c.Crawl(startURL, *depth)
+
 	for page := range responseCh {
-		fmt.Printf("found: %s \n %s \n %q\n", page.title, page.url, page.urls)
+		print(page)
 	}
-	close(responseCh)
 }
 
-func (c *Crawler) crawl(link *url.URL, depth int) {
-	var wg sync.WaitGroup
-
-	if c.IsProcessed(link.String()) || depth <= 0 {
-		return
+func print(page *crawler.Page) {
+	fmt.Print(strings.Repeat(" ", page.Indent))
+	fmt.Printf("%s \"%s\"\n", page.URL.Path, page.Title)
+	for _, u := range page.URLs {
+		fmt.Print(strings.Repeat(" ", page.Indent+1))
+		fmt.Printf("%s \n", u.Path)
 	}
-	page, err := c.Fetch(link)
-	if err != nil {
-		log.Fatal(err)
-	}
-	c.responseCh <- page
-
-	for _, u := range page.urls {
-		wg.Add(1)
-		go func(u *url.URL) {
-			defer wg.Done()
-			c.crawl(u, depth-1)
-		}(u)
-	}
-	wg.Wait()
-}
-
-// utils
-func normalizeURL(u *url.URL) *url.URL {
-	flags := purell.FlagsUsuallySafeGreedy | purell.FlagRemoveFragment | purell.FlagRemoveDuplicateSlashes
-	s := purell.NormalizeURL(u, flags)
-	u, _ = url.Parse(s)
-	return u
 }
