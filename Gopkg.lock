@@ -27,6 +27,12 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/armon/go-radix"
+  packages = ["."]
+  revision = "1fca145dffbcaa8fe914309b1ec0cfc67500fe61"
+
+[[projects]]
+  branch = "master"
   name = "golang.org/x/net"
   packages = [
     "html",
@@ -60,6 +66,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "6d7db381b7aacba8abe701f73ab4dddfd7b438ce1016f43059636e077ba3c422"
+  inputs-digest = "be6eba74ac091abbab1073bbb9421864cb1a081ce521bf97d6ac8577cbc99a38"
   solver-name = "gps-cdcl"
   solver-version = 1

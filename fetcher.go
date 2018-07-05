@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	radix "github.com/armon/go-radix"
 )
 
 const (
@@ -50,8 +51,7 @@ type Crawler struct {
 	responseCh responseCh
 	client     *http.Client
 	startURL   *url.URL
-	// TODO: use a trie instead
-	seenURLs map[string]struct{} // hold already seen urls
+	seenURLs   *radix.Tree
 }
 
 // NewCrawler creates a new crawler with the given base url, crawl depth,
@@ -66,7 +66,7 @@ func NewCrawler(url *url.URL, responseCh responseCh) *Crawler {
 		client: &http.Client{
 			Timeout: defaultHTTPTimeout,
 		},
-		seenURLs: make(map[string]struct{}),
+		seenURLs: radix.New(),
 	}
 	return c
 }
@@ -78,7 +78,7 @@ func (c *Crawler) Fetch(url *url.URL) (*Page, error) {
 	}
 	// mark as seen
 	c.Lock()
-	c.seenURLs[url.String()] = struct{}{}
+	c.seenURLs.Insert(url.String(), 1)
 	c.Unlock()
 
 	start := time.Now()
@@ -100,7 +100,9 @@ func (c *Crawler) Fetch(url *url.URL) (*Page, error) {
 
 // IsProcessed returns True if url has already been visited
 func (c *Crawler) IsProcessed(url string) bool {
-	_, exists := c.seenURLs[url]
+	c.Lock()
+	defer c.Unlock()
+	_, exists := c.seenURLs.Get(url)
 	return exists
 }
 

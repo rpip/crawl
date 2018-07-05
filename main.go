@@ -53,7 +53,6 @@ func (c *Crawler) crawl(link *url.URL, depth int) {
 		}(u)
 	}
 	wg.Wait()
-	return
 }
 
 // utils
