@@ -22,7 +22,7 @@ const (
 	userAgent = "mz-crawl/2018-07-04"
 )
 
-// ErrVisitedRetry is the error throw if url has already been visited
+// ErrVisitedRetry is the error thrown if url has already been visited
 var ErrVisitedRetry = errors.New("URL already visited")
 
 type responseCh chan *Page
@@ -155,7 +155,6 @@ func (c *Crawler) processPage(resp *http.Response) *Page {
 		}
 	}
 
-	// return only unique links
 	return &Page{Title: title, URL: doc.Url, URLs: result}
 }
 
@@ -168,7 +167,6 @@ func (c *Crawler) Crawl(uri *url.URL, depth int) {
 	}
 	page, err := c.Fetch(uri)
 	if err == ErrVisitedRetry {
-		log.Printf("processed %s", c.IsProcessed(uri.Path))
 		return
 	}
 
