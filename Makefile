@@ -1,5 +1,5 @@
 # Project name
-PROJECT = crawl
+PROJECT = mz/crawl
 BUILDTAGS=
 
 .PHONY: clean all fmt vet lint build test install static deps docker
