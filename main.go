@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/rpip/crawl/crawler"
@@ -14,10 +15,16 @@ func main() {
 
 	depth := flag.Int("d", 4, "Depth of lookup within page")
 	verbose := flag.Bool("v", true, "Verbose mode")
-	baseURL := flag.String("u", "", "URL to start crawl on")
+	targetURL := flag.String("u", "", "URL to start crawl on")
 	flag.Parse()
 
-	startURL, err := url.Parse(*baseURL)
+	if *targetURL == "" {
+		fmt.Fprintf(os.Stderr, "URL to crawl is required \n")
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	startURL, err := url.Parse(*targetURL)
 	if err != nil {
 		log.Fatalf("failed to crawl %s: %v", startURL, err)
 	}

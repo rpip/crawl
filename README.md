@@ -1,6 +1,11 @@
-[![Build Status](https://travis-ci.org/rpip/crawl.svg?branch=master)](https://travis-ci.org/rpip/crawl)
+## web crawler
 
-## Installation
+Given a URL, it prints a simple site map, showing the links between pages.
+
+* It's limited to one domain
+* crawls recursively
+* don't follow external links
+
 
 ``` shell
 $ go get github.com/rpip/crawl
@@ -18,7 +23,7 @@ Usage of crawl:
 $ crawl -u=https://golang.org -d=2 -v=false > sitemap.txt
 ```
 
-## Docker
+### Docker
 
 ```shell
 $ make docker
